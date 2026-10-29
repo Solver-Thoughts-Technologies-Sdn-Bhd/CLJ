@@ -208,7 +208,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--tp);font-size:13px
       <a class="nav-item" href="#"><span class="nav-icon"><i class="ti ti-world-upload"></i></span>Publication<span class="nav-badge nb-s">41</span></a>
       <div class="nav-sec">Admin</div>
       <a class="nav-item" href="#"><span class="nav-icon"><i class="ti ti-adjustments"></i></span>Tagging rules</a>
-      <a class="nav-item" href="#"><span class="nav-icon"><i class="ti ti-history"></i></span>Audit log</a>
+      <a class="nav-item @(ViewData["ActivePage"]?.ToString() == "Audit" ? "active" : "")" href="/Audit"><span class="nav-icon"><i class="ti ti-history"></i></span>Audit log</a>
       <div class="nav-item active" style="background:var(--bga);color:var(--ta)">
         <span class="nav-icon"><i class="ti ti-users"></i></span>User management
       </div>

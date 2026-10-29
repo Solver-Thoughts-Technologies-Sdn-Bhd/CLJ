@@ -1,15 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using XMLAutoTagger.Application.Common.Interfaces;
 using XMLAutoTagger.Application.Features.Auth.DTOs;
-using XMLAutoTagger.Domain.Interfaces;
-
-using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
 using XMLAutoTagger.Domain.Enums;
+using XMLAutoTagger.Domain.Interfaces;
 
 namespace XMLAutoTagger.Application.Features.Auth.Commands
 {
@@ -18,17 +17,20 @@ namespace XMLAutoTagger.Application.Features.Auth.Commands
         private readonly IApplicationDbContext _context;
         private readonly IJwtService _jwtService;
         private readonly ICommunicationService _communicationService;
+        private readonly IAuditService _auditService;
         private readonly ILogger<LoginCommandHandler> _logger;
 
         public LoginCommandHandler(
             IApplicationDbContext context,
             IJwtService jwtService,
             ICommunicationService communicationService,
+            IAuditService auditService,
             ILogger<LoginCommandHandler> logger)
         {
             _context = context;
             _jwtService = jwtService;
             _communicationService = communicationService;
+            _auditService = auditService;
             _logger = logger;
         }
 
@@ -45,25 +47,63 @@ namespace XMLAutoTagger.Application.Features.Auth.Commands
                 .Include(u => u.Role)
                 .Include(u => u.Department)
                 .Include(u => u.Credential)
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail, cancellationToken);
 
             if (user == null)
             {
+                await _auditService.LogAsync(
+                    action: "login_failed",
+                    entityName: "User",
+                    outcome: "failure",
+                    details: new { email = normalizedEmail, reason = "User not found" },
+                    screenCode: "login",
+                    ct: cancellationToken);
+
                 throw new UnauthorizedAccessException("Invalid email or password.");
             }
 
             if (user.AccountStatus.Equals("locked", StringComparison.OrdinalIgnoreCase))
             {
+                await _auditService.LogAsync(
+                    action: "login_failed",
+                    entityName: "User",
+                    entityId: user.UserId.ToString(),
+                    targetUserId: user.UserId,
+                    outcome: "failure",
+                    details: new { email = normalizedEmail, reason = "Account is locked" },
+                    screenCode: "login",
+                    ct: cancellationToken);
+
                 throw new UnauthorizedAccessException("Account is locked due to too many failed attempts. Please contact administrator.");
             }
 
             if (!user.AccountStatus.Equals("active", StringComparison.OrdinalIgnoreCase))
             {
+                await _auditService.LogAsync(
+                    action: "login_failed",
+                    entityName: "User",
+                    entityId: user.UserId.ToString(),
+                    targetUserId: user.UserId,
+                    outcome: "failure",
+                    details: new { email = normalizedEmail, reason = $"Account status is {user.AccountStatus}" },
+                    screenCode: "login",
+                    ct: cancellationToken);
+
                 throw new UnauthorizedAccessException($"Account is {user.AccountStatus}. Please contact administrator.");
             }
 
             if (user.Credential == null || string.IsNullOrWhiteSpace(user.Credential.PasswordHash))
             {
+                await _auditService.LogAsync(
+                    action: "login_failed",
+                    entityName: "User",
+                    entityId: user.UserId.ToString(),
+                    targetUserId: user.UserId,
+                    outcome: "failure",
+                    details: new { email = normalizedEmail, reason = "No password credential configured" },
+                    screenCode: "login",
+                    ct: cancellationToken);
+
                 throw new UnauthorizedAccessException("Account has no local password configured.");
             }
 
@@ -81,7 +121,17 @@ namespace XMLAutoTagger.Application.Features.Auth.Commands
                     justLocked = true;
                 }
 
-                await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync(cancellationToken);
+
+                await _auditService.LogAsync(
+                    action: "login_failed",
+                    entityName: "User",
+                    entityId: user.UserId.ToString(),
+                    targetUserId: user.UserId,
+                    outcome: "failure",
+                    details: new { email = normalizedEmail, reason = "Invalid password", failedAttempts = user.FailedLoginCount, accountLocked = justLocked },
+                    screenCode: "login",
+                    ct: cancellationToken);
 
                 if (justLocked)
                 {
@@ -115,7 +165,17 @@ namespace XMLAutoTagger.Application.Features.Auth.Commands
             // Reset failed login counter on success
             user.FailedLoginCount = 0;
             user.LastLoginAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
+
+            await _auditService.LogAsync(
+                action: "login_success",
+                entityName: "User",
+                entityId: user.UserId.ToString(),
+                targetUserId: user.UserId,
+                outcome: "success",
+                details: new { email = user.Email, role = user.Role?.RoleCode, department = user.Department?.DepartmentName },
+                screenCode: "login",
+                ct: cancellationToken);
 
             var token = _jwtService.GenerateToken(user);
             var expiresAt = DateTime.UtcNow.AddHours(8);

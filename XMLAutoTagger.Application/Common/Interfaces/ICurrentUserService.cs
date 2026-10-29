@@ -1,11 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.Text;
-
 
 namespace XMLAutoTagger.Application.Common.Interfaces
 {
-    
     public interface ICurrentUserService
     {
         Guid? UserId { get; }
@@ -13,5 +9,7 @@ namespace XMLAutoTagger.Application.Common.Interfaces
         string? RoleCode { get; }
         string? RoleName { get; }
         bool IsAuthenticated { get; }
+        string? IpAddress { get; }
+        string? UserAgent { get; }
     }
 }

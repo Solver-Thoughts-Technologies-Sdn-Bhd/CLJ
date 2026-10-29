@@ -1,0 +1,368 @@
+@page
+@model XMLAutoTagger.WebAPI.Pages.Audit.IndexModel
+@{
+    Layout = "_Layout";
+}
+
+<style>
+    .audit-filters {
+        display: grid;
+        grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr auto;
+        gap: 10px;
+        align-items: flex-end;
+        margin-bottom: 16px;
+        background: var(--bg2);
+        padding: 12px;
+        border-radius: var(--rd);
+        border: 1px solid var(--bdr);
+    }
+    @@media (max-width: 1024px) {
+        .audit-filters {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    .badge-action {
+        font-family: var(--font-mono, monospace);
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 500;
+    }
+    .badge-action-create { background: rgba(46, 125, 50, 0.12); color: #2e7d32; border: 1px solid rgba(46, 125, 50, 0.3); }
+    .badge-action-update { background: rgba(24, 95, 165, 0.12); color: #185fa5; border: 1px solid rgba(24, 95, 165, 0.3); }
+    .badge-action-delete { background: rgba(198, 40, 40, 0.12); color: #c62828; border: 1px solid rgba(198, 40, 40, 0.3); }
+    .badge-action-auth   { background: rgba(123, 31, 162, 0.12); color: #7b1fa2; border: 1px solid rgba(123, 31, 162, 0.3); }
+    .badge-action-warn   { background: rgba(230, 81, 0, 0.12); color: #e65100; border: 1px solid rgba(230, 81, 0, 0.3); }
+
+    .json-diff-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 10px;
+    }
+    .json-box {
+        background: var(--bg3);
+        border: 1px solid var(--bdr);
+        border-radius: 6px;
+        padding: 10px;
+        font-family: monospace;
+        font-size: 11.5px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .json-box-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        color: var(--txt3);
+    }
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 20px;
+    }
+</style>
+
+<!-- FILTERS CARD -->
+<form method="get" class="audit-filters">
+    <div class="form-row" style="margin:0">
+        <label class="form-label" style="font-size:11px">Search</label>
+        <div style="position:relative">
+            <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--txt3);font-size:13px"></i>
+            <input type="text" name="Search" value="@Model.Search" class="form-input" placeholder="Search action, actor, IP..." style="padding-left:30px">
+        </div>
+    </div>
+    <div class="form-row" style="margin:0">
+        <label class="form-label" style="font-size:11px">Action</label>
+        <select name="Action" class="form-select">
+            <option value="">All actions</option>
+            <option value="login_success" selected="@(Model.Action == "login_success")">login_success</option>
+            <option value="login_failed" selected="@(Model.Action == "login_failed")">login_failed</option>
+            <option value="user_created" selected="@(Model.Action == "user_created")">user_created</option>
+            <option value="user_updated" selected="@(Model.Action == "user_updated")">user_updated</option>
+            <option value="account_locked" selected="@(Model.Action == "account_locked")">account_locked</option>
+            <option value="account_unlocked" selected="@(Model.Action == "account_unlocked")">account_unlocked</option>
+            <option value="role_created" selected="@(Model.Action == "role_created")">role_created</option>
+            <option value="role_updated" selected="@(Model.Action == "role_updated")">role_updated</option>
+            <option value="department_created" selected="@(Model.Action == "department_created")">department_created</option>
+            <option value="department_updated" selected="@(Model.Action == "department_updated")">department_updated</option>
+            <option value="permission_granted" selected="@(Model.Action == "permission_granted")">permission_granted</option>
+            <option value="permission_revoked" selected="@(Model.Action == "permission_revoked")">permission_revoked</option>
+        </select>
+    </div>
+    <div class="form-row" style="margin:0">
+        <label class="form-label" style="font-size:11px">Outcome</label>
+        <select name="Outcome" class="form-select">
+            <option value="">All outcomes</option>
+            <option value="success" selected="@(Model.Outcome == "success")">Success</option>
+            <option value="failure" selected="@(Model.Outcome == "failure")">Failure</option>
+        </select>
+    </div>
+    <div class="form-row" style="margin:0">
+        <label class="form-label" style="font-size:11px">Page size</label>
+        <select name="PageSize" class="form-select">
+            <option value="25" selected="@(Model.PageSize == 25)">25 per page</option>
+            <option value="50" selected="@(Model.PageSize == 50)">50 per page</option>
+            <option value="100" selected="@(Model.PageSize == 100)">100 per page</option>
+        </select>
+    </div>
+    <div style="display:flex;gap:6px">
+        <button type="submit" class="btn btn-sm btn-primary" style="height:34px"><i class="ti ti-filter"></i> Filter</button>
+        <a href="/Audit" class="btn btn-sm" style="height:34px"><i class="ti ti-rotate-clockwise"></i></a>
+    </div>
+</form>
+
+<!-- AUDIT TABLE CARD -->
+<div class="card">
+    <div class="card-hdr" style="justify-content:space-between">
+        <div class="card-title">
+            <i class="ti ti-history" style="color:var(--ta)"></i>
+            <span>Recorded Audit Trail</span>
+            <span class="badge b-s" style="margin-left:8px">@Model.Result.TotalCount events</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--txt3)">
+            Append-only security log & EF Core automatic change tracker
+        </div>
+    </div>
+    <div class="card-body" style="padding:0">
+        <div class="table-wrap">
+            <table class="table" style="margin:0">
+                <thead>
+                    <tr>
+                        <th style="width:170px">Timestamp (UTC)</th>
+                        <th style="width:160px">Action</th>
+                        <th>Target / Entity</th>
+                        <th>Actor</th>
+                        <th style="width:110px">Outcome</th>
+                        <th style="width:120px">IP Address</th>
+                        <th style="width:80px;text-align:right">Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Result.Items == null || Model.Result.Items.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="7" style="text-align:center;padding:40px 20px;color:var(--txt3)">
+                                <i class="ti ti-history-off" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.4"></i>
+                                No audit records found matching the current criteria.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model.Result.Items)
+                        {
+                            var badgeClass = "badge-action-update";
+                            if (item.Action.Contains("created") || item.Action.Contains("granted") || item.Action == "login_success")
+                                badgeClass = "badge-action-create";
+                            else if (item.Action.Contains("deleted") || item.Action.Contains("revoked") || item.Action == "login_failed")
+                                badgeClass = "badge-action-delete";
+                            else if (item.Action.Contains("locked"))
+                                badgeClass = "badge-action-warn";
+                            else if (item.Action.StartsWith("login") || item.Action.StartsWith("mfa") || item.Action.StartsWith("password"))
+                                badgeClass = "badge-action-auth";
+
+                            <tr>
+                                <td style="font-size:11.5px;color:var(--txt2);font-family:monospace">
+                                    <i class="ti ti-clock" style="font-size:11px;margin-right:2px;color:var(--txt3)"></i>
+                                    @item.OccurredAt.ToString("yyyy-MM-dd HH:mm:ss")
+                                </td>
+                                <td>
+                                    <span class="badge-action @badgeClass">
+                                        @item.Action
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(item.EntityName))
+                                    {
+                                        <div style="font-weight:500;font-size:12.5px;display:flex;align-items:center;gap:5px">
+                                            <span style="color:var(--ta)">@item.EntityName</span>
+                                            @if (!string.IsNullOrEmpty(item.EntityId))
+                                            {
+                                                <span style="font-family:monospace;font-size:10.5px;color:var(--txt3)">#@item.EntityId.Substring(0, Math.Min(8, item.EntityId.Length))</span>
+                                            }
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(item.TargetUserEmail))
+                                    {
+                                        <div style="font-size:11.5px;color:var(--txt3)">
+                                            @item.TargetUserName (@item.TargetUserEmail)
+                                        </div>
+                                    }
+                                    else if (string.IsNullOrEmpty(item.EntityName))
+                                    {
+                                        <span style="color:var(--txt3);font-size:11.5px">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div style="font-weight:500;font-size:12.5px">@item.ActorName</div>
+                                    @if (item.ActorId.HasValue)
+                                    {
+                                        <div style="font-size:10.5px;font-family:monospace;color:var(--txt3)">@item.ActorId.Value.ToString().Substring(0, 8)...</div>
+                                    }
+                                </td>
+                                <td>
+                                    @if (item.Outcome.Equals("success", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge b-s" style="font-size:11px;padding:2px 6px"><i class="ti ti-check"></i> Success</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge b-d" style="font-size:11px;padding:2px 6px"><i class="ti ti-alert-triangle"></i> @item.Outcome</span>
+                                    }
+                                </td>
+                                <td style="font-size:11.5px;font-family:monospace;color:var(--txt3)">
+                                    @(item.IpAddress ?? "—")
+                                </td>
+                                <td style="text-align:right">
+                                    <button type="button" class="btn btn-xs" onclick="openAuditModal('@item.AuditLogId')">
+                                        <i class="ti ti-file-text"></i> View
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- PAGINATION FOOTER -->
+    @if (Model.Result.TotalPages > 1)
+    {
+        <div class="card-ftr" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px">
+            <div style="font-size:12px;color:var(--txt3)">
+                Showing page <strong>@Model.Result.PageNumber</strong> of <strong>@Model.Result.TotalPages</strong> (@Model.Result.TotalCount total records)
+            </div>
+            <div style="display:flex;gap:6px">
+                @if (Model.Result.HasPreviousPage)
+                {
+                    <a href="?PageNumber=@(Model.Result.PageNumber - 1)&PageSize=@Model.PageSize&Search=@Model.Search&Action=@Model.Action&Outcome=@Model.Outcome" class="btn btn-xs">
+                        <i class="ti ti-chevron-left"></i> Previous
+                    </a>
+                }
+                else
+                {
+                    <button class="btn btn-xs" disabled style="opacity:0.5"><i class="ti ti-chevron-left"></i> Previous</button>
+                }
+
+                @if (Model.Result.HasNextPage)
+                {
+                    <a href="?PageNumber=@(Model.Result.PageNumber + 1)&PageSize=@Model.PageSize&Search=@Model.Search&Action=@Model.Action&Outcome=@Model.Outcome" class="btn btn-xs">
+                        Next <i class="ti ti-chevron-right"></i>
+                    </a>
+                }
+                else
+                {
+                    <button class="btn btn-xs" disabled style="opacity:0.5">Next <i class="ti ti-chevron-right"></i></button>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<!-- AUDIT DETAIL MODAL -->
+<div id="auditDetailModal" class="modal-overlay" style="display:none">
+    <div class="card" style="width:100%;max-width:760px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 36px rgba(0,0,0,0.3)">
+        <div class="card-hdr" style="justify-content:space-between">
+            <div class="card-title">
+                <i class="ti ti-history" style="color:var(--ta)"></i>
+                <span id="modalActionTitle">Audit Record Details</span>
+            </div>
+            <button type="button" class="btn btn-xs" onclick="closeAuditModal()"><i class="ti ti-x"></i></button>
+        </div>
+        <div class="card-body" style="overflow-y:auto;flex:1">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;font-size:12px">
+                <div><strong>Audit ID:</strong> <span id="modalAuditId" style="font-family:monospace;color:var(--txt3)"></span></div>
+                <div><strong>Timestamp (UTC):</strong> <span id="modalTimestamp" style="color:var(--txt2)"></span></div>
+                <div><strong>Actor:</strong> <span id="modalActor"></span></div>
+                <div><strong>Outcome:</strong> <span id="modalOutcome"></span></div>
+                <div><strong>IP Address:</strong> <span id="modalIp" style="font-family:monospace"></span></div>
+                <div><strong>Screen:</strong> <span id="modalScreen"></span></div>
+            </div>
+
+            <div style="margin-bottom:8px;font-weight:600;font-size:12px;color:var(--txt2)">
+                <i class="ti ti-git-commit" style="color:var(--ta)"></i> Property Changes / Payload Diffs:
+            </div>
+
+            <div class="json-diff-container">
+                <div>
+                    <div class="json-box-title">Old Values</div>
+                    <div id="modalOldValues" class="json-box">No previous values (new record).</div>
+                </div>
+                <div>
+                    <div class="json-box-title">New Values</div>
+                    <div id="modalNewValues" class="json-box">No new values recorded.</div>
+                </div>
+            </div>
+
+            <div style="margin-top:14px">
+                <div class="json-box-title">Raw Detail JSON</div>
+                <div id="modalRawJson" class="json-box" style="max-height:160px"></div>
+            </div>
+        </div>
+        <div class="card-ftr" style="display:flex;justify-content:flex-end">
+            <button type="button" class="btn btn-sm" onclick="closeAuditModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    async function openAuditModal(id) {
+        try {
+            const resp = await fetch(`/Audit?handler=LogDetailJson&id=${id}`);
+            if (!resp.ok) {
+                alert('Could not fetch audit details.');
+                return;
+            }
+            const log = await resp.json();
+
+            document.getElementById('modalAuditId').textContent = log.auditLogId;
+            document.getElementById('modalTimestamp').textContent = new Date(log.occurredAt).toUTCString();
+            document.getElementById('modalActor').textContent = log.actorName || 'System';
+            document.getElementById('modalOutcome').textContent = log.outcome;
+            document.getElementById('modalIp').textContent = log.ipAddress || 'Not recorded';
+            document.getElementById('modalScreen').textContent = log.screenCode || 'system';
+            document.getElementById('modalActionTitle').textContent = `Audit Log · ${log.action}`;
+
+            let detail = {};
+            if (log.detail) {
+                try {
+                    detail = typeof log.detail === 'string' ? JSON.parse(log.detail) : log.detail;
+                } catch (e) {
+                    detail = { raw: log.detail };
+                }
+            }
+
+            document.getElementById('modalRawJson').textContent = JSON.stringify(detail, null, 2);
+
+            const oldVals = detail.oldValues && Object.keys(detail.oldValues).length > 0 ? detail.oldValues : null;
+            const newVals = detail.newValues && Object.keys(detail.newValues).length > 0 ? detail.newValues : null;
+
+            document.getElementById('modalOldValues').textContent = oldVals ? JSON.stringify(oldVals, null, 2) : '(None / Created)';
+            document.getElementById('modalNewValues').textContent = newVals ? JSON.stringify(newVals, null, 2) : '(None / Deleted)';
+
+            document.getElementById('auditDetailModal').style.display = 'flex';
+        } catch (err) {
+            console.error('Error opening audit modal:', err);
+        }
+    }
+
+    function closeAuditModal() {
+        document.getElementById('auditDetailModal').style.display = 'none';
+    }
+</script>
+}
+

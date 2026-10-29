@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using XMLAutoTagger.Application.Features.AuditLogs.DTOs;
+using XMLAutoTagger.Application.Features.AuditLogs.Queries;
 using XMLAutoTagger.Application.Features.Departments.Commands;
 using XMLAutoTagger.Application.Features.Departments.DTOs;
 using XMLAutoTagger.Application.Features.Roles.Commands;
@@ -53,5 +55,9 @@ namespace XMLAutoTagger.WebAPI.Services.ApiClients
         Task<UserDto?> GetMyProfileAsync();
         Task<bool> UpdateMyProfileAsync(string? phone, string? preferredLanguage = null);
         Task<bool> ChangeMyPasswordAsync(string currentPassword, string newPassword, string confirmPassword);
+
+        // Audit Logs
+        Task<AuditLogsResultDto> GetAuditLogsAsync(GetAuditLogsQuery query);
+        Task<AuditLogDto?> GetAuditLogByIdAsync(Guid id);
     }
 }

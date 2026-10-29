@@ -5,6 +5,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using XMLAutoTagger.Application.Features.AuditLogs.DTOs;
+using XMLAutoTagger.Application.Features.AuditLogs.Queries;
 using XMLAutoTagger.Application.Features.Departments.Commands;
 using XMLAutoTagger.Application.Features.Departments.DTOs;
 using XMLAutoTagger.Application.Features.Roles.Commands;
@@ -249,7 +251,6 @@ namespace XMLAutoTagger.WebAPI.Services.ApiClients
             }
             else
             {
-                // Auto-handles Option A: client provides token, Bearer prefix is automatically attached
                 var cleanToken = token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
                     ? token.Substring(7).Trim()
                     : token.Trim();
@@ -294,6 +295,42 @@ namespace XMLAutoTagger.WebAPI.Services.ApiClients
             await EnsureSuccessOrThrowAsync(resp);
             return resp.IsSuccessStatusCode;
         }
+
+        // --- AUDIT LOGS ---
+        public async Task<AuditLogsResultDto> GetAuditLogsAsync(GetAuditLogsQuery query)
+        {
+            EnsureAuthHeader();
+            var queryString = new List<string>();
+            queryString.Add($"pageNumber={query.PageNumber}");
+            queryString.Add($"pageSize={query.PageSize}");
+
+            if (!string.IsNullOrWhiteSpace(query.Search))
+                queryString.Add($"search={Uri.EscapeDataString(query.Search)}");
+            if (!string.IsNullOrWhiteSpace(query.Action))
+                queryString.Add($"action={Uri.EscapeDataString(query.Action)}");
+            if (!string.IsNullOrWhiteSpace(query.EntityName))
+                queryString.Add($"entityName={Uri.EscapeDataString(query.EntityName)}");
+            if (!string.IsNullOrWhiteSpace(query.Outcome))
+                queryString.Add($"outcome={Uri.EscapeDataString(query.Outcome)}");
+            if (query.FromDate.HasValue)
+                queryString.Add($"fromDate={query.FromDate.Value:yyyy-MM-ddTHH:mm:ssZ}");
+            if (query.ToDate.HasValue)
+                queryString.Add($"toDate={query.ToDate.Value:yyyy-MM-ddTHH:mm:ssZ}");
+            if (query.ActorId.HasValue)
+                queryString.Add($"actorId={query.ActorId.Value}");
+            if (query.UserId.HasValue)
+                queryString.Add($"userId={query.UserId.Value}");
+
+            var url = "api/v1/audit-logs?" + string.Join("&", queryString);
+            return await _http.GetFromJsonAsync<AuditLogsResultDto>(url, _jsonOptions) ?? new AuditLogsResultDto();
+        }
+
+        public async Task<AuditLogDto?> GetAuditLogByIdAsync(Guid id)
+        {
+            EnsureAuthHeader();
+            var resp = await _http.GetAsync($"api/v1/audit-logs/{id}");
+            if (!resp.IsSuccessStatusCode) return null;
+            return await resp.Content.ReadFromJsonAsync<AuditLogDto>(_jsonOptions);
+        }
     }
 }
-

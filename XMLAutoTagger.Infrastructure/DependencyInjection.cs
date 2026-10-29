@@ -67,6 +67,7 @@ namespace XMLAutoTagger.Infrastructure
             services.AddScoped<ICurrentUserService, CurrentUserService>();
             services.AddScoped<IPermissionService, PermissionService>();
             services.AddScoped<IJwtService, JwtService>();
+            services.AddScoped<IAuditService, AuditService>();
             services.AddHttpClient();
             services.AddScoped<ICommunicationService, CommunicationService>();
 

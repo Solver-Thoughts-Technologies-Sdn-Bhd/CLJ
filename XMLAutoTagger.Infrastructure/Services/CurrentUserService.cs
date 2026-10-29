@@ -111,5 +111,23 @@ namespace XMLAutoTagger.Infrastructure.Services
                 return !string.IsNullOrEmpty(_httpContextAccessor.HttpContext?.Request.Cookies["jwt_token"]);
             }
         }
+
+        public string? IpAddress
+        {
+            get
+            {
+                var context = _httpContextAccessor.HttpContext;
+                if (context == null) return null;
+
+                if (context.Request.Headers.TryGetValue("X-Forwarded-For", out var forwarded) && !string.IsNullOrWhiteSpace(forwarded))
+                {
+                    return forwarded.ToString().Split(',')[0].Trim();
+                }
+
+                return context.Connection.RemoteIpAddress?.ToString();
+            }
+        }
+
+        public string? UserAgent => _httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString();
     }
 }

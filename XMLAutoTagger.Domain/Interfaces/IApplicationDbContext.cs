@@ -18,6 +18,7 @@ namespace XMLAutoTagger.Domain.Interfaces
         DbSet<SmsSetting> SmsSettings { get; }
         DbSet<WhatsAppSetting> WhatsAppSettings { get; }
         DbSet<CommunicationEventItem> CommunicationEvents { get; }
+        DbSet<AuditLog> AuditLogs { get; }
 
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     }
